@@ -1,8 +1,11 @@
 import matplotlib.pyplot as mpl
 import numpy as np
+import scipy.ndimage
 import NeuralNetworks
+import scipy
+import pandas
 
-model = NeuralNetworks.FeedForward3(784, 100, 10, 0.1)
+model = NeuralNetworks.FeedForward3(784, 200, 10, 0.01)
 model.init_weights()
 
 def print_model(model: NeuralNetworks.FeedForward3):
@@ -43,23 +46,28 @@ def train_network(dataset_path, epochen):
     print('[Training]')
     print(f'- Epochen: {epochen}')
     # Trainingsdatenset laden
-    dataset_file = open(dataset_path, "r")
-    dataset_list = dataset_file.readlines()
-    dataset_file.close()
+    df = pandas.read_csv(dataset_path, header=None)
 
-    length = len(dataset_list) * epochen
+    length = len(df.index) * 3 * epochen
     printProgressBar(0, length, suffix = 'Trainingsfortschritt', length = 50)
     
     for e in range(epochen):
-        for i, record in enumerate(dataset_list):
+        for i in range(len(df.index)):
             # Einzelne Werte der CSV in einen Array einlesen
-            all_values = record.split(",")
+            all_values = df.iloc[i]
             # Eingabe formatieren
             inputs = (np.asarray(all_values[1:], dtype=float) / 255.0 * 0.99) + 0.01
+            # Leicht gedrehte Bildvarianten erstellen
+            inputs_plus10_img = scipy.ndimage.rotate(inputs.reshape(28,28), 10, cval=0.01, reshape=False).flatten()
+            inputs_minus10_img = scipy.ndimage.rotate(inputs.reshape(28,28), -10, cval=0.01, reshape=False).flatten()
             targets = np.zeros(10) + 0.01
             targets[int(all_values[0])] = 0.99
             model.train(inputs, targets)
-            printProgressBar(iteration=((i + 1) + e * len(dataset_list)), total=length, suffix = 'Trainingsfortschritt', length = 50)
+            printProgressBar(iteration=((i + 1) + e * len(df.index)), total=length, suffix = 'Trainingsfortschritt', length = 50)
+            model.train(inputs_plus10_img, targets)
+            printProgressBar(iteration=((i + 1) + e * len(df.index) + 1), total=length, suffix = 'Trainingsfortschritt', length = 50)
+            model.train(inputs_minus10_img, targets)
+            printProgressBar(iteration=((i + 1) + e * len(df.index) + 2), total=length, suffix = 'Trainingsfortschritt', length = 50)
     print('----------------------------------------------------------------------------------------------------')
 
 def test_network(dataset_path):
@@ -89,6 +97,12 @@ def test_network(dataset_path):
     print(f"- Performence: {performence}%")
     print('====================================================================================================')
 
+def save_weights():
+    np.savetxt("w_ih.csv", model.w_ih, delimiter=",")
+    np.savetxt("w_ho.csv", model.w_ho, delimiter=",")
+
 print_model(model)
-train_network("MNIST-Dataset/mnist_train.csv", 7)
+train_network("MNIST-Dataset/mnist_train.csv", 10)
 test_network("MNIST-Dataset/mnist_test.csv")
+save_weights()
+
